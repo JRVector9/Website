@@ -18,6 +18,9 @@
         }
         .retro-text {
             font-family: 'VT323', monospace;
+            text-rendering: geometricPrecision;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
         .crt-overlay {
             position: fixed;
@@ -44,10 +47,10 @@
             0% { bottom: 100%; }
             100% { bottom: -100px; }
         }
-        /* Orange Key Color Glow */
+        /* Orange Key Color Glow - optimized for clarity */
         .glow-orange {
             color: #ff7043;
-            text-shadow: 0 0 8px rgba(255, 112, 67, 0.8), 0 0 15px rgba(255, 112, 67, 0.4);
+            text-shadow: 0 0 2px rgba(255, 112, 67, 0.9), 0 0 4px rgba(255, 112, 67, 0.5);
         }
         .glow-slate {
             text-shadow: 0 0 10px rgba(203, 213, 225, 0.3);
