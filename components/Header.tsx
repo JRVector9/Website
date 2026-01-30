@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { AnimatedLogo } from './Logo';
 
 interface HeaderProps {
   companyName: string;
@@ -11,14 +12,7 @@ export const Header: React.FC<HeaderProps> = ({ companyName, slogan, subLabel })
   return (
     <header className="flex flex-col md:flex-row items-center md:justify-between gap-6 py-6 border-b border-slate-800">
       <div className="flex items-center gap-6">
-        <div className="relative w-24 h-24 border-2 border-glow-orange flex items-center justify-center bg-black overflow-hidden logo-grid group">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#ff704310] to-transparent pointer-events-none"></div>
-          <div className="retro-text text-5xl font-bold leading-none glow-orange flex items-baseline tracking-tighter">
-            <span>9</span>
-            <span className="text-4xl mx-1">&gt;</span>
-            <span className="text-5xl animate-blink">_</span>
-          </div>
-        </div>
+        <AnimatedLogo className="w-20 h-20 md:w-24 md:h-24" />
         
         <div>
           <h1 className="retro-text text-4xl md:text-6xl font-bold glow-orange tracking-widest leading-tight uppercase">{companyName}</h1>
