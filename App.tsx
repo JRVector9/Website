@@ -50,7 +50,7 @@ const App: React.FC = () => {
 
   if (booting) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#050505] cursor-wait">
+      <div className="fixed inset-0 flex items-center justify-center bg-[#050505] cursor-wait z-50">
         <div className="text-[#ff7043] retro-text text-4xl glow-orange animate-pulse text-center">
           <div className="mb-2">SYSTEM BOOTING...</div>
           <div className="text-xs opacity-40 font-mono text-slate-500">V9_KERNEL_OS v4.0.12</div>
