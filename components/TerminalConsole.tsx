@@ -97,6 +97,16 @@ export const TerminalConsole: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const audioCtx = useRef<AudioContext | null>(null);
+  const [dots, setDots] = useState(0);
+
+  // Processing dots animation
+  useEffect(() => {
+    if (!isProcessing) return;
+    const interval = setInterval(() => {
+      setDots(prev => (prev + 1) % 4);
+    }, 400);
+    return () => clearInterval(interval);
+  }, [isProcessing]);
 
   const playSound = (freq: number, type: OscillatorType = 'square', duration: number = 0.05, vol: number = 0.1) => {
     if (!audioCtx.current) audioCtx.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -309,21 +319,30 @@ export const TerminalConsole: React.FC = () => {
           </div>
         ))}
         
-        <form onSubmit={handleCommand} className="flex items-center gap-1 mt-1">
-          <span className="text-[#ff7043] shrink-0 select-none">
-            {formStep === 'IDLE' ? `v9@user:${currentPath}$` : `[FORM_INPUT]:`}
-          </span>
-          <input
-            ref={inputRef}
-            type="text"
-            className="bg-transparent border-none outline-none text-slate-200 flex-grow caret-[#ff7043] font-mono text-sm"
-            value={inputValue}
-            onChange={(e) => { setInputValue(e.target.value); playTypeSound(); }}
-            autoFocus
-            disabled={isProcessing}
-            spellCheck={false}
-          />
-        </form>
+        {isProcessing ? (
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-cyan-400 shrink-0 select-none">[SYSTEM]</span>
+            <span className="text-cyan-400">
+              프로세싱중<span className="inline-block w-8 text-left">{'.'.repeat(dots + 1)}</span>
+            </span>
+          </div>
+        ) : (
+          <form onSubmit={handleCommand} className="flex items-center gap-1 mt-1">
+            <span className="text-[#ff7043] shrink-0 select-none">
+              {formStep === 'IDLE' ? `v9@user:${currentPath}$` : `[FORM_INPUT]:`}
+            </span>
+            <input
+              ref={inputRef}
+              type="text"
+              className="bg-transparent border-none outline-none text-slate-200 flex-grow caret-[#ff7043] font-mono text-sm"
+              value={inputValue}
+              onChange={(e) => { setInputValue(e.target.value); playTypeSound(); }}
+              autoFocus
+              disabled={isProcessing}
+              spellCheck={false}
+            />
+          </form>
+        )}
       </div>
     </div>
   );
