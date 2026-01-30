@@ -1,56 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { TerminalLine } from '../types';
+import { TerminalLine, Inquiry } from '../types';
 import { GoogleGenAI } from "@google/genai";
 
-// Gemini AI (optional - only if API_KEY is set)
-const GEMINI_API_KEY = process.env.API_KEY || process.env.GEMINI_API_KEY;
-const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
-
-// Ollama settings
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen3:8b';
-
-// AI Response function with Gemini priority, Ollama fallback
-async function getAIResponse(prompt: string, systemPrompt: string): Promise<string> {
-  // Try Gemini first if API key is available
-  if (ai && GEMINI_API_KEY) {
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: prompt,
-        config: { systemInstruction: systemPrompt, temperature: 0.7 },
-      });
-      if (response.text) {
-        return response.text;
-      }
-    } catch (geminiError) {
-      console.warn('Gemini API failed, trying Ollama fallback:', geminiError);
-    }
-  }
-
-  // Fallback to Ollama
-  try {
-    const response = await fetch('/api/ollama/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        prompt: `${systemPrompt}\n\nUser: ${prompt}`,
-        stream: false
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.response || 'NO DATA.';
-  } catch (ollamaError) {
-    console.error('Ollama API failed:', ollamaError);
-    return 'AI SERVICE UNAVAILABLE. Try basic commands: help, about, ls, cat';
-  }
-}
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const ASCII_LOGO = `
  __      ________ _____ _______ ____  _____ 
@@ -63,28 +16,28 @@ const ASCII_LOGO = `
           VECTOR NINE [SYSTEM-09]
 `;
 
-const SYSTEM_PROMPT = `You are the Vector Nine OS Terminal Agent. 
-Company Name: Vector Nine (벡터 나인)
-Slogan: "비전에 정확한 방향을 더하다"
-Nature: Engineering-first IT company. Respond in Korean.
-Style: Professional, concise, DOS terminal. Max 3 sentences.`;
+const SYSTEM_PROMPT = `You are the Vector Nine OS Terminal Agent. Respond in Korean. Style: Professional, concise, DOS terminal. Max 3 sentences.`;
 
 const VFS: Record<string, any> = {
   '/': {
     'about.txt': 'Vector Nine: Adding precise direction to vision.\nIT Solutions Engineering Collective.',
     'mission.txt': 'Our mission is to engineer trajectories, not just software.',
-    'secret.txt': 'SYSTEM_MSG: Use code V9_ALPHA_2024 for a 9% priority pass.',
     'projects': {
       'cloud_arch.doc': 'Cloud Architecture implementation log v2.4',
-      'neural_core.doc': 'Neural Core integration documentation.',
-      'dapps.doc': 'Decentralized Applications engine v0.9'
+      'neural_core.doc': 'Neural Core integration documentation.'
     }
   }
 };
 
-type FormStep = 'IDLE' | 'ASK_NAME' | 'ASK_CONTACT' | 'ASK_DETAILS' | 'SUBMITTING';
+type FormStep = 'IDLE' | 'ASK_NAME' | 'ASK_BUDGET' | 'ASK_DETAILS' | 'SUBMITTING';
 
-export const TerminalConsole: React.FC = () => {
+interface TerminalProps {
+  externalCommand?: string;
+  onAdminAccess?: () => void;
+  welcomeMessage: string;
+}
+
+export const TerminalConsole: React.FC<TerminalProps> = ({ externalCommand, onAdminAccess, welcomeMessage }) => {
   const [lines, setLines] = useState<TerminalLine[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -92,21 +45,11 @@ export const TerminalConsole: React.FC = () => {
   const [glitch, setGlitch] = useState(false);
   
   const [formStep, setFormStep] = useState<FormStep>('IDLE');
-  const [formData, setFormData] = useState({ name: '', contact: '', details: '' });
+  const [formData, setFormData] = useState({ name: '', budget: '', details: '' });
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const audioCtx = useRef<AudioContext | null>(null);
-  const [dots, setDots] = useState(0);
-
-  // Processing dots animation
-  useEffect(() => {
-    if (!isProcessing) return;
-    const interval = setInterval(() => {
-      setDots(prev => (prev + 1) % 4);
-    }, 400);
-    return () => clearInterval(interval);
-  }, [isProcessing]);
 
   const playSound = (freq: number, type: OscillatorType = 'square', duration: number = 0.05, vol: number = 0.1) => {
     if (!audioCtx.current) audioCtx.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -128,8 +71,10 @@ export const TerminalConsole: React.FC = () => {
     setGlitch(true);
     setTimeout(() => setGlitch(false), 200);
   };
-  const playSuccessSound = () => {
-    playSound(1000, 'sine', 0.05, 0.05);
+  const playSuccessSound = () => playSound(1000, 'sine', 0.05, 0.05);
+  const playStepSound = () => {
+    playSound(1200, 'square', 0.05, 0.03);
+    setTimeout(() => playSound(1600, 'square', 0.05, 0.03), 50);
   };
 
   const addLine = (text: string, type: TerminalLine['type'] = 'info') => {
@@ -141,65 +86,78 @@ export const TerminalConsole: React.FC = () => {
     setLines(prev => [...prev, newLine]);
   };
 
+  const saveInquiry = (data: typeof formData) => {
+    const existing: Inquiry[] = JSON.parse(localStorage.getItem('v9_inquiries') || '[]');
+    const newEntry: Inquiry = { 
+      ...data, 
+      id: Date.now(), 
+      date: new Date().toISOString(),
+      status: 'NEW' 
+    };
+    localStorage.setItem('v9_inquiries', JSON.stringify([...existing, newEntry]));
+  };
+
   useEffect(() => {
     const initialMessages = [
       "V9_OS KERNEL LOADING...",
-      "SYSTEM CHECK... [STABLE]",
-      "TYPE 'help' FOR COMMANDS OR 'inquiry' TO START PROJECT LOG."
+      "SYSTEM STATUS: STABLE",
+      welcomeMessage,
+      "-------------------------------------------",
+      "입력 가능한 명령어를 확인하려면 'help'를 입력하세요.",
+      "작업 문의를 시작하시려면 'inquiry'를 입력하세요."
     ];
     let i = 0;
     const interval = setInterval(() => {
       if (i < initialMessages.length) {
-        addLine(initialMessages[i], 'info');
-        playSound(600 + i * 100, 'sine', 0.05, 0.02);
+        const type = (i === 5) ? 'command' : 'info';
+        addLine(initialMessages[i], type as any);
+        playSound(600 + i * 50, 'sine', 0.05, 0.02);
         i++;
-      } else {
-        clearInterval(interval);
-      }
-    }, 200);
+      } else { clearInterval(interval); }
+    }, 150);
     return () => clearInterval(interval);
-  }, []);
+  }, [welcomeMessage]);
+
+  useEffect(() => {
+    if (externalCommand) {
+      processCommand(externalCommand);
+    }
+  }, [externalCommand]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [lines]);
 
-  const getDirContent = (path: string) => {
-    const parts = path.split('/').filter(Boolean);
-    let current = VFS['/'];
-    for (const part of parts) {
-      if (current[part] && typeof current[part] === 'object') {
-        current = current[part];
-      } else { return null; }
-    }
-    return current;
-  };
-
-  const handleCommand = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputValue.trim() || isProcessing) return;
-
-    const fullCmd = inputValue.trim();
-    setInputValue('');
+  const processCommand = async (fullCmd: string) => {
+    if (isProcessing) return;
     
     if (formStep !== 'IDLE') {
       addLine(fullCmd, 'command');
       if (formStep === 'ASK_NAME') {
         setFormData(prev => ({ ...prev, name: fullCmd }));
-        addLine("연락처를 입력해주세요.", 'info');
-        setFormStep('ASK_CONTACT');
+        playStepSound();
+        addLine("[01/03] DATA RECEIVED.", 'success');
+        addLine("[02/03] 예상 예산(만원) 혹은 협의 여부를 입력해주세요.", 'info');
+        setFormStep('ASK_BUDGET');
       } 
-      else if (formStep === 'ASK_CONTACT') {
-        setFormData(prev => ({ ...prev, contact: fullCmd }));
-        addLine("상세 내용을 입력해주세요.", 'info');
+      else if (formStep === 'ASK_BUDGET') {
+        setFormData(prev => ({ ...prev, budget: fullCmd }));
+        playStepSound();
+        addLine("[02/03] BUDGET LOGGED.", 'success');
+        addLine("[03/03] 요구사항 및 프로젝트 상세 설명을 입력해주세요.", 'info');
         setFormStep('ASK_DETAILS');
       } 
       else if (formStep === 'ASK_DETAILS') {
-        setFormData(prev => ({ ...prev, details: fullCmd }));
+        const finalData = { ...formData, details: fullCmd };
+        setFormData(finalData);
+        playStepSound();
+        addLine("[03/03] REQUIREMENTS LOGGED.", 'success');
         setIsProcessing(true);
-        addLine("데이터 기록 중...", 'info');
+        addLine("--- SAVING TO LOCAL_VFS ---", 'info');
         setTimeout(() => {
-          addLine("프로젝트 인콰이어리가 성공적으로 기록되었습니다.", 'success');
+          saveInquiry(finalData);
+          addLine("SUCCESS: 문의 내용이 시스템에 기록되었습니다.", 'success');
+          addLine("Vector Nine 엔지니어가 곧 확인하겠습니다.", 'success');
           setFormStep('IDLE');
           setIsProcessing(false);
           playSuccessSound();
@@ -208,69 +166,42 @@ export const TerminalConsole: React.FC = () => {
       return;
     }
 
-    const [cmd, ...args] = fullCmd.split(' ');
     addLine(fullCmd, 'command');
     setIsProcessing(true);
+    const [cmd] = fullCmd.split(' ');
     const lowerCmd = cmd.toLowerCase();
 
     switch (lowerCmd) {
+      case 'admin':
+      case 'sudo':
+        addLine("ACCESSING RESTRICTED AREA...", 'info');
+        setTimeout(() => {
+          if (onAdminAccess) {
+            onAdminAccess();
+            addLine("ACCESS GRANTED. ADMIN PANEL ACTIVATED.", 'success');
+          } else {
+            addLine("ERR: PERMISSION DENIED.", 'error');
+            playErrorSound();
+          }
+          setIsProcessing(false);
+        }, 800);
+        break;
+
       case 'inquiry':
-        addLine("--- PROJECT INQUIRY PROTOCOL ---", 'success');
-        addLine("성함을 입력해주십시오.", 'info');
+        playSuccessSound();
+        addLine("--- PROJECT INQUIRY PROTOCOL ACTIVATED ---", 'success');
+        addLine("[01/03] 귀하의 성함 또는 기업명을 입력해주십시오.", 'info');
         setFormStep('ASK_NAME');
         setIsProcessing(false);
         break;
 
       case 'help':
-        addLine("AVAILABLE PROTOCOLS:", 'info');
-        addLine("ls/dir - List data", 'info');
-        addLine("cd [dir] - Nav directory", 'info');
-        addLine("cat [file] - Read data", 'info');
-        addLine("inquiry - Start project consultation", 'success');
-        addLine("about - System meta", 'info');
-        addLine("clear - Flush buffer", 'info');
+        addLine("AVAILABLE COMMANDS:", 'info');
+        addLine("- inquiry : 프로젝트 문의 시작", 'success');
+        addLine("- admin   : 관리자 로그 패널 (SUDO)", 'info');
+        addLine("- ls      : 파일 목록 보기", 'info');
+        addLine("- clear   : 화면 지우기", 'info');
         playSuccessSound();
-        setIsProcessing(false);
-        break;
-
-      case 'about':
-        addLine(ASCII_LOGO, 'success');
-        addLine("VECTOR NINE: ADDING PRECISE DIRECTION TO VISION.", 'success');
-        playSuccessSound();
-        setIsProcessing(false);
-        break;
-
-      case 'ls':
-      case 'dir':
-        const dir = getDirContent(currentPath);
-        if (dir) {
-          Object.keys(dir).forEach(k => addLine(typeof dir[k] === 'object' ? `<DIR> ${k}` : `      ${k}`, 'info'));
-        }
-        setIsProcessing(false);
-        break;
-
-      case 'cd':
-        const target = args[0];
-        if (!target || target === '/') setCurrentPath('/');
-        else if (target === '..') {
-          const p = currentPath.split('/').filter(Boolean); p.pop();
-          setCurrentPath('/' + p.join('/'));
-        } else {
-          const cur = getDirContent(currentPath);
-          if (cur && cur[target] && typeof cur[target] === 'object') {
-            setCurrentPath(currentPath === '/' ? `/${target}` : `${currentPath}/${target}`);
-          } else { addLine(`ERR: PATH NOT FOUND`, 'error'); playErrorSound(); }
-        }
-        setIsProcessing(false);
-        break;
-
-      case 'cat':
-        const file = args[0];
-        const cDir = getDirContent(currentPath);
-        if (cDir && cDir[file] && typeof cDir[file] === 'string') {
-          addLine(cDir[file], 'success');
-          playSuccessSound();
-        } else { addLine(`ERR: FILE NOT FOUND`, 'error'); playErrorSound(); }
         setIsProcessing(false);
         break;
 
@@ -279,14 +210,31 @@ export const TerminalConsole: React.FC = () => {
         setIsProcessing(false);
         break;
 
+      case 'ls':
+        const dir = VFS['/'];
+        Object.keys(dir).forEach(k => addLine(typeof dir[k] === 'object' ? `<DIR> ${k}` : `      ${k}`, 'info'));
+        setIsProcessing(false);
+        break;
+
       default:
         try {
-          const responseText = await getAIResponse(fullCmd, SYSTEM_PROMPT);
-          addLine(responseText, 'info');
+          const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: fullCmd,
+            config: { systemInstruction: SYSTEM_PROMPT, temperature: 0.7 },
+          });
+          addLine(response.text || "NO DATA.", 'info');
           playSuccessSound();
-        } catch (error) { addLine("CONNECTION ERROR.", 'error'); playErrorSound(); }
+        } catch (error) { addLine("ERR: CONNECTION LOST.", 'error'); playErrorSound(); }
         setIsProcessing(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputValue.trim()) return;
+    processCommand(inputValue.trim());
+    setInputValue('');
   };
 
   return (
@@ -297,18 +245,17 @@ export const TerminalConsole: React.FC = () => {
       <div className="bg-slate-800/40 px-3 py-1 flex justify-between items-center border-b border-slate-700 shrink-0">
         <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 font-mono">v9_shell_{currentPath}</span>
         <div className="flex gap-1">
-          <div className="w-2 h-2 rounded-full bg-slate-600"></div>
-          <div className="w-2 h-2 rounded-full bg-slate-600"></div>
+          <div className="w-2 h-2 rounded-full bg-slate-700"></div>
           <div className="w-2 h-2 rounded-full bg-[#ff7043] animate-pulse"></div>
         </div>
       </div>
       
-      <div ref={scrollRef} className="flex-grow p-4 font-mono text-xs md:text-sm overflow-y-auto space-y-1 scroll-smooth">
+      <div ref={scrollRef} className="flex-grow p-4 font-mono text-xs md:text-sm overflow-y-auto space-y-1 scroll-smooth scrollbar-hide">
         {lines.map((line, idx) => (
           <div key={idx} className="flex gap-2">
             <span className="text-slate-600 shrink-0 select-none">[{line.timestamp}]</span>
             <pre className={`whitespace-pre-wrap break-all font-mono
-              ${line.type === 'command' ? 'text-[#ff7043]' : ''}
+              ${line.type === 'command' ? 'text-[#ff7043] glow-orange font-bold' : ''}
               ${line.type === 'error' ? 'text-red-400' : ''}
               ${line.type === 'success' ? 'text-slate-100 glow-slate' : ''}
               ${line.type === 'info' ? 'text-slate-400' : ''}
@@ -319,30 +266,21 @@ export const TerminalConsole: React.FC = () => {
           </div>
         ))}
         
-        {isProcessing ? (
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-cyan-400 shrink-0 select-none">[SYSTEM]</span>
-            <span className="text-cyan-400">
-              프로세싱중<span className="inline-block w-8 text-left">{'.'.repeat(dots + 1)}</span>
-            </span>
-          </div>
-        ) : (
-          <form onSubmit={handleCommand} className="flex items-center gap-1 mt-1">
-            <span className="text-[#ff7043] shrink-0 select-none">
-              {formStep === 'IDLE' ? `v9@user:${currentPath}$` : `[FORM_INPUT]:`}
-            </span>
-            <input
-              ref={inputRef}
-              type="text"
-              className="bg-transparent border-none outline-none text-slate-200 flex-grow caret-[#ff7043] font-mono text-sm"
-              value={inputValue}
-              onChange={(e) => { setInputValue(e.target.value); playTypeSound(); }}
-              autoFocus
-              disabled={isProcessing}
-              spellCheck={false}
-            />
-          </form>
-        )}
+        <form onSubmit={handleSubmit} className="flex items-center gap-1 mt-1">
+          <span className="text-[#ff7043] shrink-0 select-none font-bold">
+            {formStep === 'IDLE' ? `v9@user:${currentPath}$` : `[IN_PROGRESS]:`}
+          </span>
+          <input
+            ref={inputRef}
+            type="text"
+            className="bg-transparent border-none outline-none text-slate-100 flex-grow caret-[#ff7043] font-mono text-sm"
+            value={inputValue}
+            onChange={(e) => { setInputValue(e.target.value); playTypeSound(); }}
+            autoFocus
+            disabled={isProcessing}
+            spellCheck={false}
+          />
+        </form>
       </div>
     </div>
   );

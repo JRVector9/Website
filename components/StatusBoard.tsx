@@ -1,10 +1,14 @@
 
 import React from 'react';
 
-export const StatusBoard: React.FC = () => {
+interface StatusBoardProps {
+  title: string;
+}
+
+export const StatusBoard: React.FC<StatusBoardProps> = ({ title }) => {
   return (
     <div className="bg-[#0a0a0a] border border-slate-800 p-6 border-glow-slate">
-      <h2 className="retro-text text-2xl mb-4 border-b border-slate-800 pb-2 uppercase glow-slate text-slate-100">SYSTEM_METRICS.DAT</h2>
+      <h2 className="retro-text text-2xl mb-4 border-b border-slate-800 pb-2 uppercase glow-slate text-slate-100">{title}</h2>
       
       <div className="space-y-6">
         <div>
