@@ -3,7 +3,54 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TerminalLine } from '../types';
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Gemini AI (optional - only if API_KEY is set)
+const GEMINI_API_KEY = process.env.API_KEY || process.env.GEMINI_API_KEY;
+const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
+
+// Ollama settings
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen3:8b';
+
+// AI Response function with Gemini priority, Ollama fallback
+async function getAIResponse(prompt: string, systemPrompt: string): Promise<string> {
+  // Try Gemini first if API key is available
+  if (ai && GEMINI_API_KEY) {
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: prompt,
+        config: { systemInstruction: systemPrompt, temperature: 0.7 },
+      });
+      if (response.text) {
+        return response.text;
+      }
+    } catch (geminiError) {
+      console.warn('Gemini API failed, trying Ollama fallback:', geminiError);
+    }
+  }
+
+  // Fallback to Ollama
+  try {
+    const response = await fetch('/api/ollama/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        prompt: `${systemPrompt}\n\nUser: ${prompt}`,
+        stream: false
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.response || 'NO DATA.';
+  } catch (ollamaError) {
+    console.error('Ollama API failed:', ollamaError);
+    return 'AI SERVICE UNAVAILABLE. Try basic commands: help, about, ls, cat';
+  }
+}
 
 const ASCII_LOGO = `
  __      ________ _____ _______ ____  _____ 
@@ -224,12 +271,8 @@ export const TerminalConsole: React.FC = () => {
 
       default:
         try {
-          const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: fullCmd,
-            config: { systemInstruction: SYSTEM_PROMPT, temperature: 0.7 },
-          });
-          addLine(response.text || "NO DATA.", 'info');
+          const responseText = await getAIResponse(fullCmd, SYSTEM_PROMPT);
+          addLine(responseText, 'info');
           playSuccessSound();
         } catch (error) { addLine("CONNECTION ERROR.", 'error'); playErrorSound(); }
         setIsProcessing(false);
