@@ -15,7 +15,7 @@ export const Header: React.FC<HeaderProps> = ({ companyName, slogan, subLabel })
         <AnimatedLogo className="w-20 h-20 md:w-24 md:h-24" />
         
         <div>
-          <h1 className="retro-text text-4xl md:text-6xl font-bold glow-orange tracking-widest leading-tight uppercase">{companyName}</h1>
+          <h1 className="font-mono text-3xl md:text-5xl font-bold glow-orange tracking-wider leading-tight uppercase">{companyName}</h1>
           <p className="text-slate-500 text-[10px] tracking-[0.4em] mt-1 uppercase font-mono opacity-60">{subLabel}</p>
         </div>
       </div>
