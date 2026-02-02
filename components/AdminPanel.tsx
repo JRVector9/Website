@@ -12,11 +12,46 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onConfigChange,
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'INQUIRIES' | 'CONTENT' | 'SYSTEM'>('DASHBOARD');
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [tempConfig, setTempConfig] = useState<SiteConfig>(currentConfig);
+  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [modelLoading, setModelLoading] = useState(false);
+  const [modelError, setModelError] = useState<string | null>(null);
 
   useEffect(() => {
     const data = JSON.parse(localStorage.getItem('v9_inquiries') || '[]');
     setInquiries(data);
+
+    // Load saved model selection
+    const savedModel = localStorage.getItem('v9_ollama_model');
+    if (savedModel) setSelectedModel(savedModel);
   }, []);
+
+  const fetchOllamaModels = async () => {
+    setModelLoading(true);
+    setModelError(null);
+    try {
+      const response = await fetch('/api/ollama/tags');
+      if (!response.ok) throw new Error('Failed to connect to Ollama');
+      const data = await response.json();
+      const models = data.models?.map((m: any) => m.name) || [];
+      setOllamaModels(models);
+      if (models.length > 0 && !selectedModel) {
+        setSelectedModel(models[0]);
+      }
+    } catch (error: any) {
+      setModelError(error.message || 'Connection failed');
+      setOllamaModels([]);
+    } finally {
+      setModelLoading(false);
+    }
+  };
+
+  const saveModelSelection = () => {
+    if (selectedModel) {
+      localStorage.setItem('v9_ollama_model', selectedModel);
+      alert(`MODEL_CONFIGURED: ${selectedModel} 이(가) 기본 모델로 설정되었습니다.`);
+    }
+  };
 
   const saveConfig = () => {
     localStorage.setItem('v9_site_config', JSON.stringify(tempConfig));
@@ -268,11 +303,69 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onConfigChange,
             )}
 
             {activeTab === 'SYSTEM' && (
-              <div className="p-6 border border-slate-800 bg-slate-900/10 max-w-md">
-                <h3 className="retro-text text-xl text-slate-300 mb-4 uppercase">System_Action_Matrix</h3>
-                <button onClick={downloadJSON} className="w-full bg-slate-900 border border-[#ff7043] text-[#ff7043] p-4 text-xs font-mono font-bold hover:bg-[#ff7043] hover:text-black transition-all">
-                  EXPORT_VFS_BACKUP.json
-                </button>
+              <div className="space-y-6 max-w-2xl">
+                {/* LLM Model Configuration */}
+                <div className="p-6 border border-slate-800 bg-slate-900/10">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="retro-text text-xl text-[#ff7043] uppercase">LLM_Model_Config</h3>
+                    <button
+                      onClick={fetchOllamaModels}
+                      disabled={modelLoading}
+                      className="text-[10px] border border-slate-700 px-3 py-1 text-slate-400 hover:border-[#ff7043] hover:text-[#ff7043] transition-all font-mono disabled:opacity-50"
+                    >
+                      {modelLoading ? 'SCANNING...' : 'REFRESH_MODELS'}
+                    </button>
+                  </div>
+
+                  {modelError && (
+                    <div className="mb-4 p-3 border border-red-900 bg-red-900/20 text-red-400 text-xs font-mono">
+                      ERR: {modelError}
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-[9px] text-slate-500 font-mono uppercase tracking-widest block mb-1">
+                        Ollama Model Selection
+                      </label>
+                      <div className="flex gap-2">
+                        <select
+                          value={selectedModel}
+                          onChange={(e) => setSelectedModel(e.target.value)}
+                          className="flex-grow bg-black border border-slate-700 p-3 text-xs text-white font-mono focus:border-[#ff7043] outline-none transition-colors"
+                        >
+                          {ollamaModels.length === 0 ? (
+                            <option value="">-- REFRESH를 눌러 모델 목록 로드 --</option>
+                          ) : (
+                            ollamaModels.map(model => (
+                              <option key={model} value={model}>{model}</option>
+                            ))
+                          )}
+                        </select>
+                        <button
+                          onClick={saveModelSelection}
+                          disabled={!selectedModel || ollamaModels.length === 0}
+                          className="bg-[#ff7043] text-black font-bold px-4 py-2 text-[10px] uppercase hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          APPLY
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="text-[10px] text-slate-600 font-mono space-y-1">
+                      <div>CURRENT_MODEL: <span className="text-slate-400">{selectedModel || 'NOT_SET'}</span></div>
+                      <div>AVAILABLE_MODELS: <span className="text-slate-400">{ollamaModels.length}</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* System Actions */}
+                <div className="p-6 border border-slate-800 bg-slate-900/10">
+                  <h3 className="retro-text text-xl text-slate-300 mb-4 uppercase">System_Action_Matrix</h3>
+                  <button onClick={downloadJSON} className="w-full bg-slate-900 border border-[#ff7043] text-[#ff7043] p-4 text-xs font-mono font-bold hover:bg-[#ff7043] hover:text-black transition-all">
+                    EXPORT_VFS_BACKUP.json
+                  </button>
+                </div>
               </div>
             )}
           </main>
