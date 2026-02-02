@@ -7,8 +7,14 @@ import { GoogleGenAI } from "@google/genai";
 const GEMINI_API_KEY = process.env.API_KEY || process.env.GEMINI_API_KEY;
 const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 
-// Ollama settings
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen3:8b';
+// Ollama settings - get from localStorage or fallback to env/default
+const getOllamaModel = (): string => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('v9_ollama_model');
+    if (saved) return saved;
+  }
+  return process.env.OLLAMA_MODEL || 'qwen3:8b';
+};
 
 // AI Response function with Gemini priority, Ollama fallback
 async function getAIResponse(prompt: string, systemPrompt: string): Promise<string> {
@@ -34,7 +40,7 @@ async function getAIResponse(prompt: string, systemPrompt: string): Promise<stri
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: OLLAMA_MODEL,
+        model: getOllamaModel(),
         prompt: `${systemPrompt}\n\nUser: ${prompt}`,
         stream: false
       })
