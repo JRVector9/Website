@@ -1,0 +1,39 @@
+name: Update GitHub Stats
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # 매일 자정(UTC) 실행 - 한국시간 오전 9시
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 수동 실행 가능
+
+jobs:
+  update-stats:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate stats
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: node scripts/generate-stats.js
+
+      - name: Commit and push if changed
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add public/stats.json
+          git diff --staged --quiet || git commit -m "chore: update github stats [skip ci]"
+          git push
