@@ -308,7 +308,19 @@ export const TerminalConsole: React.FC<TerminalProps> = ({ externalCommand, onAd
             </pre>
           </div>
         ))}
-        
+
+        {isProcessing && (
+          <div className="flex items-center gap-2 text-slate-400 font-mono text-sm animate-pulse">
+            <span className="text-[#ff7043]">▶</span>
+            <span>프로세싱중</span>
+            <span className="inline-flex">
+              <span className="animate-[bounce_1s_ease-in-out_infinite]">.</span>
+              <span className="animate-[bounce_1s_ease-in-out_0.1s_infinite]">.</span>
+              <span className="animate-[bounce_1s_ease-in-out_0.2s_infinite]">.</span>
+            </span>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="flex items-center gap-1 mt-1">
           <span className="text-[#ff7043] shrink-0 select-none font-bold">
             {formStep === 'IDLE' ? `v9@user:${currentPath}$` : `[IN_PROGRESS]:`}
