@@ -1,0 +1,97 @@
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # v1.0.0, v1.2.3 등의 태그에만 반응
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to Production Dokploy
+        env:
+          DOKPLOY_API_KEY: ${{ secrets.PROD_DOKPLOY_API_KEY }}
+          DOKPLOY_URL: http://v9.iptime.org:3000/api
+          APP_ID: ${{ secrets.PROD_APP_ID }}
+        run: |
+          echo "🚀 Deploying ${{ steps.version.outputs.VERSION }} to production..."
+
+          # Dokploy API를 통해 배포 트리거 (X-API-Key 헤더 사용)
+          response=$(curl -X POST "$DOKPLOY_URL/application.deploy" \
+            -H "X-API-Key: $DOKPLOY_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"applicationId\": \"$APP_ID\",
+              \"title\": \"Deploy ${{ steps.version.outputs.VERSION }}\",
+              \"description\": \"Automated deployment from GitHub Actions\"
+            }" \
+            -w "\n%{http_code}" -s)
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ]; then
+            echo "✅ Deployment triggered successfully!"
+            echo "Response: $body"
+          else
+            echo "❌ Deployment failed with HTTP $http_code"
+            echo "Response: $body"
+            exit 1
+          fi
+
+      - name: Create deployment summary
+        if: always()
+        run: |
+          echo "## 🚀 Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Server**: http://v9.iptime.org:3000" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
