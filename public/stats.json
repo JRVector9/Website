@@ -2,13 +2,13 @@
   "linesOfCode": 29601,
   "linesFormatted": "29.6K",
   "repositories": 8,
-  "totalCommits": 184,
-  "commitsFormatted": "184",
-  "activeProject": "MSG",
-  "lastCommit": "2026-02-05T09:11:43Z",
-  "lastCommitMessage": "feat: 이메일 인증 제거, 익명 로그인으로 UX 개선 (v0.1.2)",
+  "totalCommits": 188,
+  "commitsFormatted": "188",
+  "activeProject": "Website",
+  "lastCommit": "2026-02-06T17:04:29Z",
+  "lastCommitMessage": "Merge branch 'jr9-test'",
   "openPRs": 0,
   "openIssues": 0,
   "openWork": 0,
-  "updatedAt": "2026-02-06T02:42:55.744Z"
+  "updatedAt": "2026-02-06T17:04:56.771Z"
 }
