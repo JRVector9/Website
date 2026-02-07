@@ -29,10 +29,35 @@ const App: React.FC = () => {
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(DEFAULT_CONFIG);
 
   useEffect(() => {
-    const savedConfig = localStorage.getItem('v9_site_config');
-    if (savedConfig) {
-      setSiteConfig(prev => ({ ...prev, ...JSON.parse(savedConfig) }));
-    }
+    const loadConfig = async () => {
+      try {
+        // Try to fetch from Upstash first
+        const response = await fetch('/api/get-config');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.config) {
+            setSiteConfig(prev => ({ ...prev, ...data.config }));
+            // Also save to localStorage as cache
+            localStorage.setItem('v9_site_config', JSON.stringify(data.config));
+          }
+        } else {
+          // Fallback to localStorage
+          const savedConfig = localStorage.getItem('v9_site_config');
+          if (savedConfig) {
+            setSiteConfig(prev => ({ ...prev, ...JSON.parse(savedConfig) }));
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load config:', error);
+        // Fallback to localStorage
+        const savedConfig = localStorage.getItem('v9_site_config');
+        if (savedConfig) {
+          setSiteConfig(prev => ({ ...prev, ...JSON.parse(savedConfig) }));
+        }
+      }
+    };
+
+    loadConfig();
     const timer = setTimeout(() => setBooting(false), 2000);
     return () => clearTimeout(timer);
   }, []);
