@@ -86,11 +86,10 @@ type FormStep = 'IDLE' | 'ASK_NAME' | 'ASK_BUDGET' | 'ASK_DETAILS' | 'SUBMITTING
 
 interface TerminalProps {
   externalCommand?: string;
-  onAdminAccess?: () => void;
   welcomeMessage: string;
 }
 
-export const TerminalConsole: React.FC<TerminalProps> = ({ externalCommand, onAdminAccess, welcomeMessage }) => {
+export const TerminalConsole: React.FC<TerminalProps> = ({ externalCommand, welcomeMessage }) => {
   const [lines, setLines] = useState<TerminalLine[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -227,17 +226,9 @@ export const TerminalConsole: React.FC<TerminalProps> = ({ externalCommand, onAd
     switch (lowerCmd) {
       case 'admin':
       case 'sudo':
-        addLine("ACCESSING RESTRICTED AREA...", 'info');
-        setTimeout(() => {
-          if (onAdminAccess) {
-            onAdminAccess();
-            addLine("ACCESS GRANTED. ADMIN PANEL ACTIVATED.", 'success');
-          } else {
-            addLine("ERR: PERMISSION DENIED.", 'error');
-            playErrorSound();
-          }
-          setIsProcessing(false);
-        }, 800);
+        addLine("NOTICE: Admin console has been relocated for security.", 'info');
+        addLine("Please contact system administrator for access credentials.", 'info');
+        setIsProcessing(false);
         break;
 
       case 'inquiry':

@@ -4,7 +4,6 @@ import { Header } from './components/Header';
 import { TerminalConsole } from './components/TerminalConsole';
 import { ServiceGrid } from './components/ServiceGrid';
 import { StatusBoard } from './components/StatusBoard';
-import { AdminPanel } from './components/AdminPanel';
 import { SiteConfig } from './types';
 
 const DEFAULT_CONFIG: SiteConfig = {
@@ -27,7 +26,6 @@ const DEFAULT_CONFIG: SiteConfig = {
 const App: React.FC = () => {
   const [booting, setBooting] = useState(true);
   const [extCmd, setExtCmd] = useState<string | undefined>(undefined);
-  const [showAdmin, setShowAdmin] = useState(false);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(DEFAULT_CONFIG);
 
   useEffect(() => {
@@ -42,10 +40,6 @@ const App: React.FC = () => {
   const triggerCommand = (cmd: string) => {
     setExtCmd(cmd);
     setTimeout(() => setExtCmd(undefined), 100);
-  };
-
-  const handleConfigChange = (newConfig: SiteConfig) => {
-    setSiteConfig(newConfig);
   };
 
   if (booting) {
@@ -84,36 +78,21 @@ const App: React.FC = () => {
         ))}
       </div>
 
-      {showAdmin && (
-        <AdminPanel 
-          onClose={() => setShowAdmin(false)} 
-          onConfigChange={handleConfigChange}
-          currentConfig={siteConfig}
-        />
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-7 flex flex-col gap-4">
           <div className="flex justify-between items-end px-1">
              <h2 className="retro-text text-xl text-slate-500 uppercase tracking-widest">{siteConfig.terminalTitle}</h2>
              <div className="flex gap-2 mb-1">
-                <button 
+                <button
                   onClick={() => triggerCommand('inquiry')}
                   className="text-[9px] border border-[#ff704350] px-2 py-0.5 text-[#ff7043] hover:bg-[#ff7043] hover:text-black transition-all font-mono font-bold"
                 >
                   {siteConfig.inquiryBtnText}
                 </button>
-                <button 
-                  onClick={() => setShowAdmin(true)}
-                  className="text-[9px] border border-slate-700 px-2 py-0.5 text-slate-500 hover:border-slate-400 transition-all font-mono"
-                >
-                  {siteConfig.adminBtnText}
-                </button>
              </div>
           </div>
-          <TerminalConsole 
-            externalCommand={extCmd} 
-            onAdminAccess={() => setShowAdmin(true)}
+          <TerminalConsole
+            externalCommand={extCmd}
             welcomeMessage={siteConfig.welcomeMessage}
           />
           
